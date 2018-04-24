@@ -24,8 +24,8 @@ library( cowplot )
 ```
 
 ```{r fxn}
-read_times <- function( filename ) {
-	read_delim( filename, delim = "\t", col_names = FALSE, col_types = 'c', skip =15 ) %>%
+read_times <- function( filename, skip_num=15 ) {
+	read_delim( filename, delim = "\t", col_names = FALSE, col_types = 'c', skip = skip_num ) %>%
 		as.data.frame( . ) %>%
 		unlist( . ) %>%
 		unname( . ) %>%
@@ -123,6 +123,31 @@ model <- lm( actual_time ~ CPU * motif_size, data=runtimes )
 summary( model )
 
 anova( model )
+```
+
+```{r load_fimo_benchmarks}
+file_path = "fimo_benchmark"
+
+fimo_runtimes <- data_frame( filename = dir( file_path, pattern="*.log" ) ) %>%
+	mutate( full_path = file.path( file_path, filename ) ) %>%
+	mutate( actual_time = map( full_path, read_times, skip_num=0 ) ) %>%
+	unnest( . ) %>%
+	mutate( tosplit = str_replace( filename, ".log", "" ) ) %>%
+	separate( col = tosplit, into = c( "CPU", "Iteration", "Motif" ), sep = "_" )
+
+fimo_run_stats <- fimo_runtimes %>%
+	group_by( Motif, CPU ) %>%
+	summarize( mean_time = mean( actual_time ), sd_time = sd( actual_time ) )
+```
+
+```{r show_output}
+as.data.frame( run_stats ) %>%
+	mutate( CPU = as.integer( CPU ) ) %>%
+	arrange( Motif, CPU )
+
+as.data.frame( fimo_run_stats ) %>%
+	mutate( CPU = as.integer( CPU ) ) %>%
+	arrange( Motif, CPU )
 ```
 
 ```{r session_information}
