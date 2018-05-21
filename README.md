@@ -31,6 +31,7 @@ The work was run on a computer running Ubuntu, so the requirements are assuming 
 * tidyverse
 * cowplot
 * stringr (if not included in your tidyverse version)
+* UpSetR
 
 ### Modifications
 The motifs searched, iterations, and number of CPUs can be altered.

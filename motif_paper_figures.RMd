@@ -17,10 +17,13 @@ knitr::opts_chunk$set(
 	fig.ext='jpeg' )
 ```
 
+# Import and setup
+
 ```{r imports}
 library( tidyverse )
 library( stringr )
 library( cowplot )
+library( UpSetR )
 ```
 
 ```{r fxn}
@@ -36,6 +39,8 @@ read_times <- function( filename, skip_num=15 ) {
 		return( . )
 }
 ```
+
+# Read benchmarks and plot outcomes
 
 ```{r read_data}
 file_path = "benchmark"
@@ -97,7 +102,7 @@ ggplot( run_stats, aes( x = as.numeric( CPU ), y = mean_time, group=Motif, fill=
 	theme_bw() +
 	geom_ribbon( aes( ymin = mean_time - sd_time, ymax = mean_time + sd_time ) ) +
 	scale_fill_manual( values=cbPalette ) +
-	geom_point( aes( shape=Motif ), size=2 ) +
+	geom_point( aes( shape=Motif ), size=4 ) +
 	geom_line() +
 	theme( legend.position = c( 0.75, 0.9 ),
 				 legend.background = element_rect( linetype="solid", colour="black" ) ) +
@@ -114,6 +119,8 @@ ggplot( run_stats, aes( x = as.numeric( CPU ), y = mean_time, group=Motif, fill=
 	)
 ```
 
+# Test what features matter for time as a linear model
+
 ```{r lm}
 runtimes <- runtimes %>%
 	mutate( motif_size = str_length( Motif ) )
@@ -124,6 +131,8 @@ summary( model )
 
 anova( model )
 ```
+
+# Get overall runtime stats compiled
 
 ```{r load_fimo_benchmarks}
 file_path = "fimo_benchmark"
@@ -150,6 +159,35 @@ as.data.frame( fimo_run_stats ) %>%
 	arrange( Motif, CPU )
 ```
 
+# Determine overlap between FIMO and motif scraper for one sequence
+
+```{r test_overlap}
+motif_scraper_uids <- read_csv( file = "motifs/ATTACACAAT.csv", col_names = TRUE, col_types = 'ciiccc' ) %>%
+	mutate( uid = case_when(
+		Strand == "+" ~ paste( Contig, Start, End, Strand, "ATTACACAAT", sep = "_" ),
+		Strand == "-" ~ paste( Contig, End, Start, Strand, "ATTACACAAT", sep = "_" ) ) ) %>%
+	pull( uid )
+
+fimo_uids <- read_tsv( "std_fimo/VTKDYRHAAY/fimo.txt", skip = 1, col_names = c( 'motif_id', 'motif_alt_id', 'sequence_name', 'start', 'stop', 'strand', 'score', 'pvalue', 'qvalue', 'seq' ), col_types = 'ccciicdddc' ) %>%
+	filter( seq == "ATTACACAAT" ) %>%
+	mutate( uid = paste( sequence_name, start, stop, strand, seq, sep = "_" ) ) %>%
+	arrange( sequence_name, start, stop, strand ) %>%
+	pull( uid )
+
+unique_uid_list <- c( motif_scraper_uids, fimo_uids ) %>%
+	unique( . )
+
+upset_df <- data.frame( uid = unique_uid_list ) %>%
+	mutate( MotifScraper = case_when(
+		uid %in% motif_scraper_uids ~ 1,
+		TRUE ~ 0 ) ) %>%
+	mutate( FIMO = case_when(
+		uid %in% fimo_uids ~ 1,
+		TRUE ~ 0 ) )
+
+upset( upset_df, text.scale=c( 3, 3, 3, 2, 3, 3), point.size=5, line.size=2 )
+```
+
 ```{r session_information}
 Sys.time()
 
@@ -157,3 +195,4 @@ getwd()
   
 sessionInfo()
 ```
+
